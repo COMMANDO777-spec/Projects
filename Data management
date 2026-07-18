@@ -1,0 +1,223 @@
+import json
+from abc import ABC, abstractmethod
+from pathlib import Path
+import streamlit as st
+
+DATABASE = "data.json"
+
+
+def load_data():
+    if Path(DATABASE).exists():
+        with open(DATABASE, "r") as f:
+            content = f.read()
+            if content:
+                return json.loads(content)
+    return {"Students": [], "Teachers": []}
+
+
+def save(data):
+    with open(DATABASE, "w") as f:
+        json.dump(data, f, indent=4)
+
+
+if "data" not in st.session_state:
+    st.session_state.data = load_data()
+
+data = st.session_state.data
+
+
+class People(ABC):
+    @abstractmethod
+    def roles(self):
+        pass
+
+    @abstractmethod
+    def register(self):
+        pass
+
+    @abstractmethod
+    def details(self):
+        pass
+
+
+class Student(People):
+    def roles(self):
+        return "student"
+
+    def register(self, name, age, roll):
+        for i in data["Students"]:
+            if i["roll"] == roll:
+                return False, "Student already exists"
+        data["Students"].append({
+            "name": name,
+            "age": age,
+            "roll": roll,
+            "grades": {}
+        })
+        save(data)
+        return True, "Registration successful"
+
+    def details(self, roll):
+        for s in data["Students"]:
+            if s["roll"] == roll:
+                return s
+        return None
+
+
+class Teacher(People):
+    def roles(self):
+        return "teacher"
+
+    def register(self, name, age, emp, subject):
+        for i in data["Teachers"]:
+            if i["emp"] == emp:
+                return False, "Teacher already exists"
+        data["Teachers"].append({
+            "name": name,
+            "age": age,
+            "emp": emp,
+            "subject": subject
+        })
+        save(data)
+        return True, "Registration successful"
+
+    def details(self, emp):
+        for s in data["Teachers"]:
+            if s["emp"] == emp:
+                return s
+        return None
+
+    def grades(self, roll, subject, marks):
+        for i in data["Students"]:
+            if i["roll"] == roll:
+                i["grades"][subject] = marks
+                save(data)
+                return True, "Grades added successfully"
+        return False, "Student not found"
+
+
+s = Student()
+t = Teacher()
+
+st.set_page_config(page_title="Student/Teacher Management", page_icon="🎓", layout="centered")
+st.title("🎓 Student & Teacher Management System")
+
+menu = st.sidebar.radio(
+    "Choose an action",
+    [
+        "Register a Student",
+        "Register a Teacher",
+        "View Student Details",
+        "View Teacher Details",
+        "Add Student's Marks",
+        "Browse All Records",
+    ],
+)
+
+if menu == "Register a Student":
+    st.subheader("Register a Student")
+    with st.form("register_student"):
+        name = st.text_input("Name")
+        age = st.number_input("Age", min_value=1, max_value=120, step=1)
+        roll = st.text_input("Roll number")
+        submitted = st.form_submit_button("Register")
+    if submitted:
+        if not name or not roll:
+            st.warning("Please fill in all fields.")
+        else:
+            ok, msg = s.register(name, int(age), roll)
+            (st.success if ok else st.error)(msg)
+
+elif menu == "Register a Teacher":
+    st.subheader("Register a Teacher")
+    with st.form("register_teacher"):
+        name = st.text_input("Name")
+        age = st.number_input("Age", min_value=1, max_value=120, step=1)
+        emp = st.text_input("Employee ID")
+        subject = st.text_input("Subject")
+        submitted = st.form_submit_button("Register")
+    if submitted:
+        if not name or not emp or not subject:
+            st.warning("Please fill in all fields.")
+        else:
+            ok, msg = t.register(name, int(age), emp, subject)
+            (st.success if ok else st.error)(msg)
+
+elif menu == "View Student Details":
+    st.subheader("View Student Details")
+    roll = st.text_input("Enter roll number")
+    if st.button("Search"):
+        record = s.details(roll)
+        if record:
+            st.success("Student found")
+            st.write(f"**Name:** {record['name']}")
+            st.write(f"**Roll:** {record['roll']}")
+            st.write(f"**Age:** {record['age']}")
+            if record["grades"]:
+                st.write("**Grades:**")
+                st.table(
+                    {"Subject": list(record["grades"].keys()),
+                     "Marks": list(record["grades"].values())}
+                )
+            else:
+                st.info("No grades recorded yet.")
+        else:
+            st.error("Student not found")
+
+elif menu == "View Teacher Details":
+    st.subheader("View Teacher Details")
+    emp = st.text_input("Enter employee ID")
+    if st.button("Search"):
+        record = t.details(emp)
+        if record:
+            st.success("Teacher found")
+            st.write(f"**Name:** {record['name']}")
+            st.write(f"**Employee ID:** {record['emp']}")
+            st.write(f"**Age:** {record['age']}")
+            st.write(f"**Subject:** {record['subject']}")
+        else:
+            st.error("Teacher not found")
+
+elif menu == "Add Student's Marks":
+    st.subheader("Add Student's Marks")
+    with st.form("add_marks"):
+        roll = st.text_input("Roll number")
+        subject = st.text_input("Subject")
+        marks = st.number_input("Marks", min_value=0.0, max_value=100.0, step=0.5)
+        submitted = st.form_submit_button("Add Marks")
+    if submitted:
+        if not roll or not subject:
+            st.warning("Please fill in all fields.")
+        else:
+            ok, msg = t.grades(roll, subject, marks)
+            (st.success if ok else st.error)(msg)
+
+elif menu == "Browse All Records":
+    st.subheader("All Students")
+    if data["Students"]:
+        st.dataframe(
+            [
+                {
+                    "Name": d["name"],
+                    "Roll": d["roll"],
+                    "Age": d["age"],
+                    "Grades": ", ".join(f"{k}: {v}" for k, v in d["grades"].items()) or "—",
+                }
+                for d in data["Students"]
+            ],
+            use_container_width=True,
+        )
+    else:
+        st.info("No students registered yet.")
+
+    st.subheader("All Teachers")
+    if data["Teachers"]:
+        st.dataframe(
+            [
+                {"Name": d["name"], "Employee ID": d["emp"], "Age": d["age"], "Subject": d["subject"]}
+                for d in data["Teachers"]
+            ],
+            use_container_width=True,
+        )
+    else:
+        st.info("No teachers registered yet.")
