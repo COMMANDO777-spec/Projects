@@ -1,0 +1,138 @@
+import streamlit as st
+from pathlib import Path
+
+st.set_page_config(page_title="File Manager", page_icon="📁", layout="centered")
+
+st.title("📁 File Manager")
+st.caption("Create, Read, Update, and Delete text files — a Streamlit UI over basic Python file handling.")
+
+tab_create, tab_read, tab_update, tab_delete = st.tabs(
+    ["➕ Create", "📖 Read", "✏️ Update", "🗑️ Delete"]
+)
+
+# ---------------- CREATE ----------------
+with tab_create:
+    st.subheader("Create a new file")
+    filename = st.text_input("File name", key="create_filename", placeholder="example.txt")
+    content = st.text_area("File content", key="create_content", height=150)
+
+    if st.button("Create File", type="primary"):
+        if not filename:
+            st.warning("Please enter a file name.")
+        else:
+            path = Path(filename)
+            try:
+                if path.exists():
+                    st.error(f"File '{path}' already exists.")
+                else:
+                    with open(path, "w") as f:
+                        f.write(content)
+                    st.success(f"File '{path}' created successfully.")
+            except Exception as err:
+                st.error(f"An error occurred: {err}")
+
+# ---------------- READ ----------------
+with tab_read:
+    st.subheader("Read a file")
+    filename = st.text_input("File name", key="read_filename", placeholder="example.txt")
+
+    if st.button("Read File"):
+        if not filename:
+            st.warning("Please enter a file name.")
+        else:
+            path = Path(filename)
+            try:
+                if path.exists():
+                    with open(path, "r") as f:
+                        data = f.read()
+                    st.success(f"Contents of '{path}':")
+                    st.code(data if data else "(file is empty)")
+                else:
+                    st.error(f"File '{path}' doesn't exist.")
+            except Exception as err:
+                st.error(f"An error occurred: {err}")
+
+# ---------------- UPDATE ----------------
+with tab_update:
+    st.subheader("Update a file")
+    filename = st.text_input("File name", key="update_filename", placeholder="example.txt")
+    action = st.radio(
+        "Choose an action",
+        ["Rename", "Append", "Overwrite"],
+        key="update_action",
+        horizontal=True,
+    )
+
+    if action == "Rename":
+        new_name = st.text_input("New file name", key="rename_target")
+        if st.button("Rename File", type="primary"):
+            if not filename or not new_name:
+                st.warning("Please enter both the current and new file name.")
+            else:
+                src, dst = Path(filename), Path(new_name)
+                try:
+                    if not src.exists():
+                        st.error(f"File '{src}' doesn't exist.")
+                    elif dst.exists():
+                        st.error(f"File '{dst}' already exists.")
+                    else:
+                        src.rename(dst)
+                        st.success(f"Renamed '{src}' to '{dst}'.")
+                except Exception as err:
+                    st.error(f"An error occurred: {err}")
+
+    elif action == "Append":
+        append_text = st.text_area("Text to append", key="append_text", height=100)
+        if st.button("Append to File", type="primary"):
+            if not filename:
+                st.warning("Please enter a file name.")
+            else:
+                path = Path(filename)
+                try:
+                    if not path.exists():
+                        st.error(f"File '{path}' doesn't exist.")
+                    else:
+                        with open(path, "a") as f:
+                            f.write("\n" + append_text)
+                        st.success(f"Successfully appended to '{path}'.")
+                except Exception as err:
+                    st.error(f"An error occurred: {err}")
+
+    else:  # Overwrite
+        overwrite_text = st.text_area("New content (overwrites the file)", key="overwrite_text", height=100)
+        if st.button("Overwrite File", type="primary"):
+            if not filename:
+                st.warning("Please enter a file name.")
+            else:
+                path = Path(filename)
+                try:
+                    if not path.exists():
+                        st.error(f"File '{path}' doesn't exist.")
+                    else:
+                        with open(path, "w") as f:
+                            f.write(overwrite_text)
+                        st.success(f"Successfully overwrote '{path}'.")
+                except Exception as err:
+                    st.error(f"An error occurred: {err}")
+
+# ---------------- DELETE ----------------
+with tab_delete:
+    st.subheader("Delete a file")
+    filename = st.text_input("File name", key="delete_filename", placeholder="example.txt")
+
+    if st.button("Delete File", type="secondary"):
+        if not filename:
+            st.warning("Please enter a file name.")
+        else:
+            path = Path(filename)
+            try:
+                if path.exists():
+                    path.unlink()
+                    st.success(f"File '{path}' deleted successfully.")
+                else:
+                    st.error(f"File '{path}' doesn't exist.")
+            except Exception as err:
+                st.error(f"An error occurred: {err}")
+
+st.divider()
+st.caption("Built with Python + Streamlit — a simple CRUD file manager.")
